@@ -13,9 +13,6 @@ max_cpus: int = multiprocessing.cpu_count()
 Maximum number of CPUs to use for running cases. Defaults to the number of CPUs on the system.
 """
 
-_reserved_cpus = 0
-_cpus_cond = asyncio.Condition()
-
 
 class Case:
     """
@@ -115,13 +112,6 @@ class Case:
         :param check: If True, raise a `RuntimeError` if the command returns a non-zero exit code.
         :param cpus: The number of CPUs to reserve for the command. The command will not be executed until the requested number of CPUs is available.
         """
-        global _reserved_cpus
-        cpus = min(cpus, max_cpus)  # Oversubscribe if necessary
-        if cpus > 0:
-            async with _cpus_cond:
-                await _cpus_cond.wait_for(lambda: max_cpus - _reserved_cpus >= cpus)
-                _reserved_cpus += cpus
-
         subproc = await asyncio.create_subprocess_exec(
             cmd,
             *args,
@@ -130,11 +120,6 @@ class Case:
             cwd=self.path,
         )
         stdout, stderr = await subproc.communicate()
-
-        if cpus > 0:
-            async with _cpus_cond:
-                _reserved_cpus -= cpus
-                _cpus_cond.notify(n=cpus)
 
         if check and subproc.returncode != 0:
             raise RuntimeError(
