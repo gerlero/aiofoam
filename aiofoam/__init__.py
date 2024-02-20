@@ -6,7 +6,7 @@ from typing import Optional, Union
 
 import aioshutil
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 max_cpus: int = multiprocessing.cpu_count()
 """
