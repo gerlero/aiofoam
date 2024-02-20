@@ -32,12 +32,12 @@ dynamic = ["version"]
 lint = [
     "mypy>=1,<2",
     "pytest>=8,<9",
-    "pytest-asyncio",
+    "pytest-asyncio>=0.23,<0.24",
     "black",
 ]
 test = [
-    "pytest>=7,<9",
-    "pytest-asyncio",
+    "pytest>=8,<9",
+    "pytest-asyncio>=0.23,<0.24",
     "pytest-cov",
 ]
 
