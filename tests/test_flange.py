@@ -30,7 +30,7 @@ async def test_run(flange: Case, parallel: bool, script: Optional[bool]) -> None
 @pytest.mark.parametrize("script", [None, True])
 async def test_run_no_parallel(flange: Case, script: Optional[bool]) -> None:
     with pytest.raises(RuntimeError):
-        await flange.run(script=True)
+        await flange.run(script=script)
 
 
 def test_path() -> None:
