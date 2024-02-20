@@ -117,9 +117,10 @@ class Case:
         """
         global _reserved_cpus
         cpus = min(cpus, max_cpus)  # Oversubscribe if necessary
-        async with _cpus_cond:
-            await _cpus_cond.wait_for(lambda: max_cpus - _reserved_cpus >= cpus)
-            _reserved_cpus += cpus
+        if cpus > 0:
+            async with _cpus_cond:
+                await _cpus_cond.wait_for(lambda: max_cpus - _reserved_cpus >= cpus)
+                _reserved_cpus += cpus
 
         subproc = await asyncio.create_subprocess_exec(
             cmd,
@@ -130,9 +131,10 @@ class Case:
         )
         stdout, stderr = await subproc.communicate()
 
-        async with _cpus_cond:
-            _reserved_cpus -= cpus
-            _cpus_cond.notify(n=cpus)
+        if cpus > 0:
+            async with _cpus_cond:
+                _reserved_cpus -= cpus
+                _cpus_cond.notify(n=cpus)
 
         if check and subproc.returncode != 0:
             raise RuntimeError(
