@@ -40,6 +40,7 @@ test = [
     "pytest-asyncio",
     "pytest-cov",
 ]
+docs = ["sphinx>=7,<8"]
 
 [project.urls]
 Homepage = "https://github.com/gerlero/aiofoam"
