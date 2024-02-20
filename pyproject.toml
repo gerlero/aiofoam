@@ -1,0 +1,63 @@
+[build-system]
+requires = ["setuptools>=61.2"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aiofoam"
+description = "Async OpenFOAM case runner"
+readme = "README.md"
+requires-python = ">=3.9"
+authors = [{name = "Gabriel S. Gerlero", email = "ggerlero@cimec.unl.edu.ar"}]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Operating System :: POSIX",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Software Development",
+    "Typing :: Typed",
+]
+
+dependencies = ["aioshutil>=1,<2"]
+
+dynamic = ["version"]
+
+[project.optional-dependencies]
+lint = [
+    "mypy>=1,<2",
+    "pytest>=8,<9",
+    "pytest-asyncio",
+    "black",
+]
+test = [
+    "pytest>=7,<9",
+    "pytest-asyncio",
+    "pytest-cov",
+]
+
+[project.urls]
+Homepage = "https://github.com/gerlero/aiofoam"
+Repository = "https://github.com/gerlero/aiofoam"
+Documentation = "https://aiofoam.readthedocs.io"
+
+[tool.setuptools]
+packages = ["aiofoam"]
+
+[tool.setuptools.dynamic]
+version = {attr = "aiofoam.__version__"}
+
+[tool.setuptools.package-data]
+"aiofoam" = ["py.typed"]
+
+[tool.mypy]
+packages = [
+    "aiofoam",
+    "tests",
+]
+strict = true
