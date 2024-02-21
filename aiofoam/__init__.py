@@ -2,7 +2,8 @@ import asyncio
 import multiprocessing
 
 from pathlib import Path
-from typing import Optional, Union
+from contextlib import asynccontextmanager
+from typing import Optional, Union, AsyncGenerator
 
 import aioshutil
 
@@ -12,6 +13,29 @@ max_cpus: int = multiprocessing.cpu_count()
 """
 Maximum number of CPUs to use for running cases. Defaults to the number of CPUs on the system.
 """
+
+_reserved_cpus: int = 0
+_cpus_cond = None  # Cannot be initialized here yet
+
+
+@asynccontextmanager
+async def _cpus_sem(cpus: int) -> AsyncGenerator[None, None]:
+    global _reserved_cpus, _cpus_cond
+    if _cpus_cond is None:
+        _cpus_cond = asyncio.Condition()
+
+    cpus = min(cpus, max_cpus)
+    if cpus > 0:
+        async with _cpus_cond:
+            await _cpus_cond.wait_for(lambda: max_cpus - _reserved_cpus >= cpus)
+            _reserved_cpus += cpus
+    try:
+        yield
+    finally:
+        if cpus > 0:
+            async with _cpus_cond:
+                _reserved_cpus -= cpus
+                _cpus_cond.notify(cpus)
 
 
 class Case:
@@ -112,14 +136,15 @@ class Case:
         :param check: If True, raise a `RuntimeError` if the command returns a non-zero exit code.
         :param cpus: The number of CPUs to reserve for the command. The command will not be executed until the requested number of CPUs is available.
         """
-        subproc = await asyncio.create_subprocess_exec(
-            cmd,
-            *args,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            cwd=self.path,
-        )
-        stdout, stderr = await subproc.communicate()
+        async with _cpus_sem(cpus):
+            subproc = await asyncio.create_subprocess_exec(
+                cmd,
+                *args,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                cwd=self.path,
+            )
+            stdout, stderr = await subproc.communicate()
 
         if check and subproc.returncode != 0:
             raise RuntimeError(
