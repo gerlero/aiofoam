@@ -169,6 +169,8 @@ class Case:
             script_path = None
         else:
             script_path = Path(script)
+            if not script_path.is_absolute():
+                script_path = self.path / script_path
 
         if script_path is not None:
             await self.exec(str(script_path), check=check)
@@ -216,6 +218,8 @@ class Case:
             script_path = None
         else:
             script_path = Path(script)
+            if not script_path.is_absolute():
+                script_path = self.path / script_path
 
         if script_path is not None:
             if cpus is None:
