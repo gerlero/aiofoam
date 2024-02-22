@@ -45,7 +45,7 @@ class Case:
     :param path: The path to the case directory.
     """
 
-    def __init__(self, path: Union[Path, str], /):
+    def __init__(self, path: Union[Path, str]):
         self.path = Path(path)
 
     def _clean_script(self) -> Optional[Path]:
@@ -225,10 +225,12 @@ class Case:
             if cpus is None:
                 if self._nprocessors() > 0:
                     cpus = self._nprocessors()
-                elif nsubdomains := await self._nsubdomains() is not None:
-                    cpus = nsubdomains
                 else:
-                    cpus = 1
+                    nsubdomains = await self._nsubdomains()
+                    if nsubdomains is not None:
+                        cpus = nsubdomains
+                    else:
+                        cpus = 1
 
             await self.exec(str(script_path), check=check, cpus=cpus)
         else:
