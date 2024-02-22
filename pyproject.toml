@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "aiofoam"
 description = "Async OpenFOAM case runner"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.7"
 authors = [{name = "Gabriel S. Gerlero", email = "ggerlero@cimec.unl.edu.ar"}]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -15,6 +15,8 @@ classifiers = [
     "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
     "Operating System :: POSIX",
     "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
@@ -31,13 +33,13 @@ dynamic = ["version"]
 [project.optional-dependencies]
 lint = [
     "mypy>=1,<2",
-    "pytest>=8,<9",
-    "pytest-asyncio>=0.23,<0.24",
+    "pytest>=7,<9",
+    "pytest-asyncio>=0.21,<0.24",
     "black",
 ]
 test = [
-    "pytest>=8,<9",
-    "pytest-asyncio>=0.23,<0.24",
+    "pytest>=7,<9",
+    "pytest-asyncio>=0.21,<0.24",
     "pytest-cov",
 ]
 docs = [
