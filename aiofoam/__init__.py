@@ -8,7 +8,7 @@ from typing import Optional, Union, AsyncGenerator, Mapping
 
 import aioshutil
 
-__version__ = "0.1.7"
+__version__ = "0.1.8"
 
 max_cpus: int = multiprocessing.cpu_count()
 """
