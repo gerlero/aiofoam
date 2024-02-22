@@ -3,7 +3,7 @@ import multiprocessing
 
 from pathlib import Path
 from contextlib import asynccontextmanager
-from typing import Optional, Union, AsyncGenerator
+from typing import Optional, Union, AsyncGenerator, Mapping
 
 import aioshutil
 
@@ -126,7 +126,12 @@ class Case:
         return len(list(self.path.glob("processor*")))
 
     async def exec(
-        self, cmd: str, *args: str, check: bool = True, cpus: int = 0
+        self,
+        cmd: str,
+        *args: str,
+        check: bool = True,
+        cpus: int = 0,
+        env: Optional[Mapping[str, str]] = None,
     ) -> str:
         """
         Execute a command inside the case directory.
@@ -135,6 +140,7 @@ class Case:
         :param args: Additional arguments for the command.
         :param check: If True, raise a `RuntimeError` if the command returns a non-zero exit code.
         :param cpus: The number of CPUs to reserve for the command. The command will not be executed until the requested number of CPUs is available.
+        :param env: Environment variables to set for the command. If None, use the current environment.
         """
         async with _cpus_sem(cpus):
             subproc = await asyncio.create_subprocess_exec(
@@ -143,6 +149,7 @@ class Case:
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 cwd=self.path,
+                env=env,
             )
             stdout, stderr = await subproc.communicate()
 
@@ -153,13 +160,18 @@ class Case:
         return stdout.decode()
 
     async def clean(
-        self, script: Union[None, bool, Path, str] = None, *, check: bool = False
+        self,
+        script: Union[None, bool, Path, str] = None,
+        *,
+        check: bool = False,
+        env: Optional[Mapping[str, str]] = None,
     ) -> None:
         """
         Clean this case.
 
         :param script: The path to the `(All)clean` script. If True, find the clean script automatically. If False, ignore any clean scripts. If None, use the a clean script only if it exists.
         :param check: If True, raise a `RuntimeError` if the clean script returns a non-zero exit code.
+        :param env: Environment variables to set for the clean script. If None, use the current environment.
         """
         if script is True or script is None:
             script_path = self._clean_script()
@@ -173,7 +185,7 @@ class Case:
                 script_path = self.path / script_path
 
         if script_path is not None:
-            await self.exec(str(script_path), check=check)
+            await self.exec(str(script_path), check=check, env=env)
         else:
             rm_processor = (self.path / "system" / "decomposeParDict").is_file()
 
@@ -201,6 +213,7 @@ class Case:
         parallel: Optional[bool] = None,
         cpus: Optional[int] = None,
         check: bool = True,
+        env: Optional[Mapping[str, str]] = None,
     ) -> None:
         """
         Run this case.
@@ -209,6 +222,7 @@ class Case:
         :param parallel: If True, run in parallel. If False, run in serial. If None, autodetect whether to run in parallel.
         :param cpus: The number of CPUs to reserve for the run. The run will wait until the requested number of CPUs is available. If None, autodetect the number of CPUs to reserve.
         :param check: If True, raise a `RuntimeError` if any command returns a non-zero exit code.
+        :param env: Environment variables to set for the run script or commands. If None, use the current environment.
         """
         if script is True or script is None:
             script_path = self._run_script(parallel=parallel)
@@ -235,7 +249,7 @@ class Case:
             await self.exec(str(script_path), check=check, cpus=cpus)
         else:
             if (self.path / "system" / "blockMeshDict").is_file():
-                await self.exec("blockMesh", check=check)
+                await self.exec("blockMesh", check=check, env=env)
 
             if parallel is None:
                 if (
@@ -252,7 +266,7 @@ class Case:
                     self._nprocessors() == 0
                     and (self.path / "system" / "decomposeParDict").is_file()
                 ):
-                    await self.exec("decomposePar", check=check)
+                    await self.exec("decomposePar", check=check, env=env)
 
                 nprocessors = self._nprocessors()
                 if cpus is None:
@@ -266,11 +280,12 @@ class Case:
                     "-parallel",
                     check=check,
                     cpus=cpus,
+                    env=env,
                 )
             else:
                 if cpus is None:
                     cpus = 1
-                await self.exec(application, check=check, cpus=cpus)
+                await self.exec(application, check=check, cpus=cpus, env=env)
 
     def __fspath__(self) -> str:
         return str(self.path)
