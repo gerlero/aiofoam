@@ -17,7 +17,7 @@ def flange(tmp_path: Path) -> Case:
     return Case(dest)
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio_cooperative
 @pytest.mark.parametrize("parallel", [True, False])
 @pytest.mark.parametrize("script", [None, True])
 async def test_run(flange: Case, parallel: bool, script: Optional[bool]) -> None:
@@ -26,7 +26,7 @@ async def test_run(flange: Case, parallel: bool, script: Optional[bool]) -> None
     await flange.run(parallel=parallel, script=script)
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio_cooperative
 @pytest.mark.parametrize(
     "run_script", ["Allrun", "Allrun-parallel", Path("Allrun"), Path("Allrun-parallel")]
 )
@@ -41,7 +41,7 @@ async def test_run_scripts(
     await flange.run(script=run_script)
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio_cooperative
 @pytest.mark.parametrize("script", [None, True])
 async def test_run_no_parallel(
     flange: Case, script: Union[None, bool, Path, str]
@@ -50,5 +50,6 @@ async def test_run_no_parallel(
         await flange.run(script=script)
 
 
+@pytest.mark.asyncio_cooperative
 def test_path() -> None:
     assert Path(FLANGE) == FLANGE.path
