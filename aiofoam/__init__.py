@@ -1,5 +1,6 @@
 import asyncio
 import multiprocessing
+import os
 
 from pathlib import Path
 from contextlib import asynccontextmanager
@@ -142,6 +143,11 @@ class Case:
         :param cpus: The number of CPUs to reserve for the command. The command will not be executed until the requested number of CPUs is available.
         :param env: Environment variables to set for the command. If None, use the current environment.
         """
+        if env is None:
+            env = os.environ
+        env = dict(env)
+        env["PWD"] = str(self.path.absolute())
+
         async with _cpus_sem(cpus):
             subproc = await asyncio.create_subprocess_exec(
                 cmd,
