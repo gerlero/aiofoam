@@ -209,7 +209,9 @@ class Case:
                     if rm_processor and p.name.startswith("processor"):
                         await aioshutil.rmtree(p)
 
-            if (self.path / "system" / "blockMeshDict").is_file():
+            if (self.path / "system" / "blockMeshDict").is_file() and (
+                self.path / "constant" / "polyMesh"
+            ).exists():
                 await aioshutil.rmtree(self.path / "constant" / "polyMesh")
 
     async def run(

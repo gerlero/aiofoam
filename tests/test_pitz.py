@@ -28,6 +28,13 @@ async def test_run(pitz: Case, script: Optional[bool]) -> None:
 
 
 @pytest.mark.asyncio
+async def test_double_clean(pitz: Case) -> None:
+    await pitz.clean()
+    await pitz.clean(check=True)
+    await pitz.run()
+
+
+@pytest.mark.asyncio
 async def test_run_script(pitz: Case) -> None:
     with pytest.raises(RuntimeError):
         await pitz.run(script=True)
