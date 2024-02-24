@@ -14,7 +14,7 @@ PITZ = Case(
 
 @pytest.fixture
 def pitz(tmp_path: Path) -> Case:
-    dest = tmp_path / PITZ.path.name
+    dest = tmp_path / PITZ.name
     shutil.copytree(PITZ.path, dest)
     return Case(dest)
 
