@@ -43,3 +43,10 @@ async def test_run_script(pitz: Case) -> None:
 async def test_run_parallel(pitz: Case, script: Optional[bool]) -> None:
     with pytest.raises(RuntimeError):
         await pitz.run(script=script, parallel=True)
+
+
+@pytest.mark.asyncio
+async def test_pyfoam(pitz: Case) -> None:
+    pytest.importorskip("PyFoam")
+
+    assert pitz.to_pyfoam().times == ["0"]

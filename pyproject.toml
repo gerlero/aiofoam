@@ -41,6 +41,7 @@ test = [
     "pytest>=7,<9",
     "pytest-asyncio>=0.21,<0.24",
     "pytest-cov",
+    "PyFoam==2023.7; python_version<'3.12'",
 ]
 docs = [
     "sphinx>=7,<8",

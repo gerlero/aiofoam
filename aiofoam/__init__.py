@@ -9,6 +9,11 @@ from typing import Optional, Union, AsyncGenerator, Mapping, Set
 
 import aioshutil
 
+try:
+    from PyFoam.RunDictionary.SolutionDirectory import SolutionDirectory  # type: ignore
+except ModuleNotFoundError:
+    pass
+
 __version__ = "0.2.2"
 
 max_cpus: int = multiprocessing.cpu_count()
@@ -357,6 +362,14 @@ class Case:
         The name of the case.
         """
         return self.path.name
+
+    def to_pyfoam(self) -> "SolutionDirectory":
+        """
+        Create a PyFoam `SolutionDirectory` from this case. Requires `PyFoam` to be installed.
+        """
+        from PyFoam.RunDictionary.SolutionDirectory import SolutionDirectory
+
+        return SolutionDirectory(self.path)
 
     def __fspath__(self) -> str:
         return str(self.path)
