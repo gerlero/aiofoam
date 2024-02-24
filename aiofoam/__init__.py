@@ -4,7 +4,7 @@ import os
 
 from pathlib import Path
 from contextlib import asynccontextmanager
-from typing import Optional, Union, AsyncGenerator, Mapping
+from typing import Optional, Union, AsyncGenerator, Mapping, Set
 
 import aioshutil
 
@@ -50,6 +50,30 @@ class Case:
         self.path = Path(path).absolute()
         if not self.path.is_dir():
             raise NotADirectoryError(f"{self.path} is not a directory")
+
+    def _clean_paths(self) -> Set[Path]:
+        has_decompose = (self.path / "system" / "decomposeParDict").is_file()
+        has_blockmesh = (self.path / "system" / "blockMeshDict").is_file()
+
+        paths: Set[Path] = set()
+
+        for p in self.path.iterdir():
+            if p.is_dir():
+                try:
+                    t = float(p.name)
+                except ValueError:
+                    pass
+                else:
+                    if t != 0:
+                        paths.add(p)
+
+                if has_decompose and p.name.startswith("processor"):
+                    paths.add(p)
+
+        if has_blockmesh and (self.path / "constant" / "polyMesh").exists():
+            paths.add(self.path / "constant" / "polyMesh")
+
+        return paths
 
     def _clean_script(self) -> Optional[Path]:
         """
@@ -195,26 +219,8 @@ class Case:
         if script_path is not None:
             await self.exec(str(script_path), check=check, env=env)
         else:
-            rm_processor = (self.path / "system" / "decomposeParDict").is_file()
-
-            for p in self.path.iterdir():
-                if p.is_dir():
-                    try:
-                        t = float(p.name)
-                    except ValueError:
-                        pass
-                    else:
-                        if t != 0:
-                            await aioshutil.rmtree(p)
-                            continue
-
-                    if rm_processor and p.name.startswith("processor"):
-                        await aioshutil.rmtree(p)
-
-            if (self.path / "system" / "blockMeshDict").is_file() and (
-                self.path / "constant" / "polyMesh"
-            ).exists():
-                await aioshutil.rmtree(self.path / "constant" / "polyMesh")
+            for p in self._clean_paths():
+                await aioshutil.rmtree(p)
 
     async def run(
         self,
@@ -304,6 +310,25 @@ class Case:
         :param dest: The destination path.
         """
         return Case(await aioshutil.copytree(self.path, dest, symlinks=True))
+
+    async def clone(self, dest: Union[Path, str]) -> "Case":
+        """
+        Clone this case (make a clean copy).
+
+        :param dest: The destination path.
+        """
+        if self._clean_script() is not None:
+            copy = await self.copy(dest)
+            await copy.clean()
+            return copy
+
+        dest = Path(dest)
+        clean_paths = self._clean_paths()
+        for p in self.path.iterdir():
+            if p not in clean_paths:
+                await aioshutil.copytree(p, dest / p.name, symlinks=True)
+
+        return Case(dest)
 
     @property
     def name(self) -> str:

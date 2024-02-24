@@ -14,7 +14,7 @@ PITZ = Case(
 
 @pytest_asyncio.fixture
 async def pitz(tmp_path: Path) -> Case:
-    return await PITZ.copy(tmp_path / PITZ.name)
+    return await PITZ.clone(tmp_path / PITZ.name)
 
 
 @pytest.mark.asyncio

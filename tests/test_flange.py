@@ -12,7 +12,7 @@ FLANGE = Case(Path(os.environ["FOAM_TUTORIALS"]) / "basic" / "laplacianFoam" / "
 
 @pytest_asyncio.fixture
 async def flange(tmp_path: Path) -> Case:
-    return await FLANGE.copy(tmp_path / FLANGE.name)
+    return await FLANGE.clone(tmp_path / FLANGE.name)
 
 
 @pytest.mark.asyncio
