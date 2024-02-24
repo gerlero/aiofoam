@@ -48,6 +48,8 @@ class Case:
 
     def __init__(self, path: Union[Path, str]):
         self.path = Path(path).absolute()
+        if not self.path.is_dir():
+            raise NotADirectoryError(f"{self.path} is not a directory")
 
     def _clean_script(self) -> Optional[Path]:
         """
