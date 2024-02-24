@@ -47,7 +47,7 @@ class Case:
     """
 
     def __init__(self, path: Union[Path, str]):
-        self.path = Path(path)
+        self.path = Path(path).absolute()
 
     def _clean_script(self) -> Optional[Path]:
         """
