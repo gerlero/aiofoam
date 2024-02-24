@@ -249,12 +249,10 @@ class Case:
             if cpus is None:
                 if self._nprocessors() > 0:
                     cpus = self._nprocessors()
+                elif (nsubdomains := await self._nsubdomains()) is not None:
+                    cpus = nsubdomains
                 else:
-                    nsubdomains = await self._nsubdomains()
-                    if nsubdomains is not None:
-                        cpus = nsubdomains
-                    else:
-                        cpus = 1
+                    cpus = 1
 
             await self.exec(str(script_path), check=check, cpus=cpus)
         else:
