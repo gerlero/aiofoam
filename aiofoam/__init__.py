@@ -295,6 +295,14 @@ class Case:
                     cpus = 1
                 await self.exec(application, check=check, cpus=cpus, env=env)
 
+    async def copy(self, dest: Union[Path, str]) -> "Case":
+        """
+        Make a copy of this case.
+
+        :param dest: The destination path.
+        """
+        return Case(await aioshutil.copytree(self.path, dest, symlinks=True))
+
     @property
     def name(self) -> str:
         """

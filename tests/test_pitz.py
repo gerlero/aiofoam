@@ -1,7 +1,6 @@
 import pytest
 
 import os
-import shutil
 from pathlib import Path
 from typing import Optional
 
@@ -13,10 +12,8 @@ PITZ = Case(
 
 
 @pytest.fixture
-def pitz(tmp_path: Path) -> Case:
-    dest = tmp_path / PITZ.name
-    shutil.copytree(PITZ.path, dest)
-    return Case(dest)
+async def pitz(tmp_path: Path) -> Case:
+    return await PITZ.copy(tmp_path / PITZ.name)
 
 
 @pytest.mark.asyncio_cooperative
