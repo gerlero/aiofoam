@@ -154,8 +154,8 @@ class Case:
 
     async def _exec(
         self,
-        cmd: str,
-        *args: str,
+        prog: Union[str, Path],
+        *args: Union[str, Path],
         parallel: bool = False,
         check: bool = True,
         cpus: int = 0,
@@ -169,13 +169,24 @@ class Case:
         env = dict(env)
         env["PWD"] = str(self.path.absolute())
 
+        which = await aioshutil.which(prog, path=env.get("PATH", ""))
+        if which is not None:
+            prog = which
+        elif not Path(prog).is_absolute():
+            prog = self.path / prog
+
         if parallel:
-            args = ("-np", str(self._nprocessors()), cmd, "-parallel", *args)
-            cmd = "mpiexec"
+            prog, args = "mpiexec", (
+                "-np",
+                str(self._nprocessors()),
+                prog,
+                "-parallel",
+                *args,
+            )
 
         async with _cpus_sem(cpus):
             subproc = await asyncio.create_subprocess_exec(
-                cmd,
+                prog,
                 *args,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
@@ -186,7 +197,7 @@ class Case:
 
         if check and subproc.returncode != 0:
             raise RuntimeError(
-                f"{cmd} failed with return code {subproc.returncode}\n{stderr.decode()}"
+                f"{prog} failed with return code {subproc.returncode}\n{stderr.decode()}"
             )
         return stdout.decode()
 
@@ -223,7 +234,7 @@ class Case:
 
     async def run(
         self,
-        *cmd: str,
+        *cmd: Union[str, Path],
         script: Union[None, bool, Path, str] = None,
         parallel: Optional[bool] = None,
         cpus: Optional[int] = None,
