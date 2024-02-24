@@ -40,6 +40,22 @@ async def test_run_scripts(
 
 
 @pytest.mark.asyncio
+async def test_run_cmd(flange: Case) -> None:
+    (flange.path / "0.orig").rename(flange.path / "0")
+    await flange.run(
+        "ansysToFoam",
+        str(
+            Path(os.environ["FOAM_TUTORIALS"]) / "resources" / "geometry" / "flange.ans"
+        ),
+        "-scale",
+        "0.001",
+    )
+    await flange.run("decomposePar")
+    await flange.run("laplacianFoam", parallel=True)
+    await flange.run("reconstructPar")
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("script", [None, True])
 async def test_run_no_parallel(
     flange: Case, script: Union[None, bool, Path, str]
