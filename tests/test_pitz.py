@@ -1,4 +1,5 @@
 import pytest
+import pytest_asyncio
 
 import os
 from pathlib import Path
@@ -11,7 +12,7 @@ PITZ = Case(
 )
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def pitz(tmp_path: Path) -> Case:
     return await PITZ.copy(tmp_path / PITZ.name)
 
