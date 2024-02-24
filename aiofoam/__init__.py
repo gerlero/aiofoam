@@ -121,7 +121,7 @@ class Case:
         Return the application name as set in the controlDict.
         """
         return (
-            await self.exec(
+            await self._exec(
                 "foamDictionary",
                 "-entry",
                 "application",
@@ -137,7 +137,7 @@ class Case:
         if not (self.path / "system" / "decomposeParDict").is_file():
             return None
         return int(
-            await self.exec(
+            await self._exec(
                 "foamDictionary",
                 "-entry",
                 "numberOfSubdomains",
@@ -152,27 +152,26 @@ class Case:
         """
         return len(list(self.path.glob("processor*")))
 
-    async def exec(
+    async def _exec(
         self,
         cmd: str,
         *args: str,
+        parallel: bool = False,
         check: bool = True,
         cpus: int = 0,
         env: Optional[Mapping[str, str]] = None,
     ) -> str:
         """
-        Execute a command inside the case directory.
-
-        :param cmd: The command to execute.
-        :param args: Additional arguments for the command.
-        :param check: If True, raise a `RuntimeError` if the command returns a non-zero exit code.
-        :param cpus: The number of CPUs to reserve for the command. The command will not be executed until the requested number of CPUs is available.
-        :param env: Environment variables to set for the command. If None, use the current environment.
+        Execute a command in the context of this case.
         """
         if env is None:
             env = os.environ
         env = dict(env)
         env["PWD"] = str(self.path.absolute())
+
+        if parallel:
+            args = ("-np", str(self._nprocessors()), cmd, "-parallel", *args)
+            cmd = "mpiexec"
 
         async with _cpus_sem(cpus):
             subproc = await asyncio.create_subprocess_exec(
@@ -193,8 +192,8 @@ class Case:
 
     async def clean(
         self,
-        script: Union[None, bool, Path, str] = None,
         *,
+        script: Union[None, bool, Path, str] = None,
         check: bool = False,
         env: Optional[Mapping[str, str]] = None,
     ) -> None:
@@ -217,91 +216,104 @@ class Case:
                 script_path = self.path / script_path
 
         if script_path is not None:
-            await self.exec(str(script_path), check=check, env=env)
+            await self._exec(str(script_path), check=check, env=env)
         else:
             for p in self._clean_paths():
                 await aioshutil.rmtree(p)
 
     async def run(
         self,
+        *cmd: str,
         script: Union[None, bool, Path, str] = None,
-        *,
         parallel: Optional[bool] = None,
         cpus: Optional[int] = None,
         check: bool = True,
         env: Optional[Mapping[str, str]] = None,
-    ) -> None:
+    ) -> str:
         """
         Run this case.
 
+        :param cmd: Command to run, including arguments. If not provided, autodetect the command to run.
         :param script: The path to the `(All)run` script. If True, find the run script automatically. If False, ignore any run scripts. If None, use a run script if it exists.
         :param parallel: If True, run in parallel. If False, run in serial. If None, autodetect whether to run in parallel.
         :param cpus: The number of CPUs to reserve for the run. The run will wait until the requested number of CPUs is available. If None, autodetect the number of CPUs to reserve.
         :param check: If True, raise a `RuntimeError` if any command returns a non-zero exit code.
         :param env: Environment variables to set for the run script or commands. If None, use the current environment.
         """
-        if script is True or script is None:
-            script_path = self._run_script(parallel=parallel)
-            if script and script_path is None:
-                raise RuntimeError("No run script found")
-        elif script is False:
-            script_path = None
-        else:
-            script_path = Path(script)
-            if not script_path.is_absolute():
-                script_path = self.path / script_path
+        if not cmd:
+            script_path: Optional[Path]
+            if script is not True and script is not False and script is not None:
+                script_path = Path(script)
+                if not script_path.is_absolute():
+                    script_path = self.path / script_path
+            elif script is True or script is None:
+                script_path = self._run_script(parallel=parallel)
+                if script is True and script_path is None:
+                    raise RuntimeError("No run script found")
+            elif script is False:
+                script_path = None
 
-        if script_path is not None:
-            if cpus is None:
-                if self._nprocessors() > 0:
-                    cpus = self._nprocessors()
-                else:
-                    nsubdomains = await self._nsubdomains()
-                    if nsubdomains is not None:
-                        cpus = nsubdomains
+            if script_path is None:
+                if (self.path / "system" / "blockMeshDict").is_file():
+                    await self._exec("blockMesh", check=check, cpus=1, env=env)
+
+                if parallel is None:
+                    if (
+                        self._nprocessors() > 0
+                        or (self.path / "system" / "decomposeParDict").is_file()
+                    ):
+                        parallel = True
                     else:
-                        cpus = 1
+                        parallel = False
 
-            await self.exec(str(script_path), check=check, cpus=cpus)
-        else:
-            if (self.path / "system" / "blockMeshDict").is_file():
-                await self.exec("blockMesh", check=check, env=env)
+                application = await self._application()
+                if parallel:
+                    if (
+                        self._nprocessors() == 0
+                        and (self.path / "system" / "decomposeParDict").is_file()
+                    ):
+                        await self._exec("decomposePar", check=check, cpus=1, env=env)
 
-            if parallel is None:
-                if (
-                    self._nprocessors() > 0
-                    or (self.path / "system" / "decomposeParDict").is_file()
-                ):
-                    parallel = True
+                    if cpus is None:
+                        cpus = self._nprocessors()
                 else:
-                    parallel = False
-
-            application = await self._application()
-            if parallel:
-                if (
-                    self._nprocessors() == 0
-                    and (self.path / "system" / "decomposeParDict").is_file()
-                ):
-                    await self.exec("decomposePar", check=check, env=env)
-
-                nprocessors = self._nprocessors()
-                if cpus is None:
-                    cpus = self._nprocessors()
-
-                await self.exec(
-                    "mpiexec",
-                    "-np",
-                    str(nprocessors),
-                    application,
-                    "-parallel",
-                    check=check,
-                    cpus=cpus,
-                    env=env,
+                    if cpus is None:
+                        cpus = 1
+                return await self._exec(
+                    application, parallel=parallel, check=check, cpus=cpus, env=env
                 )
+
             else:
                 if cpus is None:
+                    if self._nprocessors() > 0:
+                        cpus = self._nprocessors()
+                    else:
+                        nsubdomains = await self._nsubdomains()
+                        if nsubdomains is not None:
+                            cpus = nsubdomains
+                        else:
+                            cpus = 1
+
+                return await self._exec(
+                    str(script_path), check=check, cpus=cpus, env=env
+                )
+
+        else:
+            if script is not None:
+                raise ValueError("Cannot specify both cmd and script")
+
+            if parallel is None:
+                parallel = False
+
+            if cpus is None:
+                if parallel:
+                    cpus = self._nprocessors()
+                else:
                     cpus = 1
-                await self.exec(application, check=check, cpus=cpus, env=env)
+
+            return await self._exec(
+                *cmd, parallel=parallel, check=check, cpus=cpus, env=env
+            )
 
     async def copy(self, dest: Union[Path, str]) -> "Case":
         """
