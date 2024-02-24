@@ -55,6 +55,10 @@ jobs:
     - name: Test with pytest
       run: |
         openfoam pytest --cov=aiofoam
+      env:
+        OMPI_MCA_rmaps_base_oversubscribe: 1
+        OMPI_ALLOW_RUN_AS_ROOT: 1
+        OMPI_ALLOW_RUN_AS_ROOT_CONFIRM: 1
     - name: Upload code coverage results to Codecov
       uses: codecov/codecov-action@v3
       with:
