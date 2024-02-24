@@ -1,7 +1,6 @@
 import pytest
 
 import os
-import shutil
 from pathlib import Path
 from typing import Optional, Union
 
@@ -11,10 +10,8 @@ FLANGE = Case(Path(os.environ["FOAM_TUTORIALS"]) / "basic" / "laplacianFoam" / "
 
 
 @pytest.fixture
-def flange(tmp_path: Path) -> Case:
-    dest = tmp_path / FLANGE.name
-    shutil.copytree(FLANGE.path, dest)
-    return Case(dest)
+async def flange(tmp_path: Path) -> Case:
+    return await FLANGE.copy(tmp_path / FLANGE.name)
 
 
 @pytest.mark.asyncio_cooperative
