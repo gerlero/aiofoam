@@ -295,6 +295,13 @@ class Case:
                     cpus = 1
                 await self.exec(application, check=check, cpus=cpus, env=env)
 
+    @property
+    def name(self) -> str:
+        """
+        The name of the case.
+        """
+        return self.path.name
+
     def __fspath__(self) -> str:
         return str(self.path)
 

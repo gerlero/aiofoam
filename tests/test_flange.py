@@ -12,7 +12,7 @@ FLANGE = Case(Path(os.environ["FOAM_TUTORIALS"]) / "basic" / "laplacianFoam" / "
 
 @pytest.fixture
 def flange(tmp_path: Path) -> Case:
-    dest = tmp_path / FLANGE.path.name
+    dest = tmp_path / FLANGE.name
     shutil.copytree(FLANGE.path, dest)
     return Case(dest)
 
