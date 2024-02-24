@@ -33,13 +33,13 @@ dynamic = ["version"]
 [project.optional-dependencies]
 lint = [
     "mypy>=1,<2",
-    "pytest>=7,<7.3",
-    "pytest-asyncio-cooperative>=0.34,<0.36",
+    "pytest>=7,<9",
+    "pytest-asyncio>=0.21,<0.24",
     "black",
 ]
 test = [
-    "pytest>=7,<7.3",
-    "pytest-asyncio-cooperative>=0.34,<0.36",
+    "pytest>=7,<9",
+    "pytest-asyncio>=0.21,<0.24",
     "pytest-cov",
 ]
 docs = [
