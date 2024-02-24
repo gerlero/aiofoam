@@ -1,4 +1,5 @@
 import pytest
+import pytest_asyncio
 
 import os
 from pathlib import Path
@@ -9,7 +10,7 @@ from aiofoam import Case
 FLANGE = Case(Path(os.environ["FOAM_TUTORIALS"]) / "basic" / "laplacianFoam" / "flange")
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def flange(tmp_path: Path) -> Case:
     return await FLANGE.copy(tmp_path / FLANGE.name)
 
