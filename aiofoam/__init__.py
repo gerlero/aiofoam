@@ -14,7 +14,7 @@ try:
 except ModuleNotFoundError:
     pass
 
-__version__ = "0.2.2"
+__version__ = "0.2.3"
 
 max_cpus: int = multiprocessing.cpu_count()
 """
