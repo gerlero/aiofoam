@@ -1,6 +1,7 @@
 import asyncio
 import multiprocessing
 import os
+import sys
 
 from pathlib import Path
 from contextlib import asynccontextmanager
@@ -167,13 +168,8 @@ class Case:
         if env is None:
             env = os.environ
         env = dict(env)
-        env["PWD"] = str(self.path.absolute())
-
-        which = await aioshutil.which(prog, path=env.get("PATH", ""))
-        if which is not None:
-            prog = which
-        elif not Path(prog).is_absolute():
-            prog = self.path / prog
+        if "PWD" in env and Path(env["PWD"]) == Path.cwd():
+            env["PWD"] = str(self.path)
 
         if parallel:
             prog, args = "mpiexec", (
@@ -183,6 +179,10 @@ class Case:
                 "-parallel",
                 *args,
             )
+
+        if sys.version_info < (3, 8):
+            prog = str(prog)
+            args = (str(a) for a in args)
 
         async with _cpus_sem(cpus):
             subproc = await asyncio.create_subprocess_exec(
@@ -227,7 +227,7 @@ class Case:
                 script_path = self.path / script_path
 
         if script_path is not None:
-            await self._exec(str(script_path), check=check, env=env)
+            await self._exec(script_path, check=check, env=env)
         else:
             for p in self._clean_paths():
                 await aioshutil.rmtree(p)
@@ -305,9 +305,7 @@ class Case:
                         else:
                             cpus = 1
 
-                return await self._exec(
-                    str(script_path), check=check, cpus=cpus, env=env
-                )
+                return await self._exec(script_path, check=check, cpus=cpus, env=env)
 
         else:
             if script is not None:
