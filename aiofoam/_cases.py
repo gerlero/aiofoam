@@ -1,9 +1,8 @@
 import asyncio
 import os
-import sys
 
 from pathlib import Path
-from typing import Optional, Union, Mapping, Set
+from typing import Optional, Union, Mapping, Set, Sequence
 
 import aioshutil
 
@@ -12,6 +11,7 @@ try:
 except ModuleNotFoundError:
     pass
 
+from ._subprocess import run
 from ._cpus import exclusive_cpus
 
 
@@ -97,12 +97,14 @@ class Case:
         Return the application name as set in the controlDict.
         """
         return (
-            await self._exec(
-                "foamDictionary",
-                "-entry",
-                "application",
-                "-value",
-                "system/controlDict",
+            await self._run(
+                [
+                    "foamDictionary",
+                    "-entry",
+                    "application",
+                    "-value",
+                    "system/controlDict",
+                ]
             )
         ).strip()
 
@@ -113,12 +115,14 @@ class Case:
         if not (self.path / "system" / "decomposeParDict").is_file():
             return None
         return int(
-            await self._exec(
-                "foamDictionary",
-                "-entry",
-                "numberOfSubdomains",
-                "-value",
-                "system/decomposeParDict",
+            await self._run(
+                [
+                    "foamDictionary",
+                    "-entry",
+                    "numberOfSubdomains",
+                    "-value",
+                    "system/decomposeParDict",
+                ]
             )
         )
 
@@ -128,12 +132,13 @@ class Case:
         """
         return len(list(self.path.glob("processor*")))
 
-    async def _exec(
+    async def _run(
         self,
-        prog: Union[str, Path],
-        *args: Union[str, Path],
+        args: Union[Sequence[Union[str, Path]], str],
+        *,
         parallel: bool = False,
         check: bool = True,
+        shell: Union[None, bool, Path, str] = None,
         cpus: int = 0,
         env: Optional[Mapping[str, str]] = None,
     ) -> str:
@@ -147,40 +152,35 @@ class Case:
             env["PWD"] = str(self.path)
 
         if parallel:
-            prog, args = "mpiexec", (
+            if isinstance(args, str):
+                args = [args]
+                if shell is None:
+                    shell = True
+
+            args = [
+                "mpiexec",
                 "-np",
                 str(self._nprocessors()),
-                prog,
+                args[0],
                 "-parallel",
-                *args,
-            )
-
-        if sys.version_info < (3, 8):
-            prog = str(prog)
-            args = (str(a) for a in args)
+                *args[1:],
+            ]
 
         async with exclusive_cpus(cpus):
-            subproc = await asyncio.create_subprocess_exec(
-                prog,
-                *args,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
+            return await run(
+                args,
+                check=check,
+                shell=shell,
                 cwd=self.path,
                 env=env,
             )
-            stdout, stderr = await subproc.communicate()
-
-        if check and subproc.returncode != 0:
-            raise RuntimeError(
-                f"{prog} failed with return code {subproc.returncode}\n{stderr.decode()}"
-            )
-        return stdout.decode()
 
     async def clean(
         self,
         *,
         script: Union[None, bool, Path, str] = None,
         check: bool = False,
+        shell: Union[bool, Path, str] = False,
         env: Optional[Mapping[str, str]] = None,
     ) -> None:
         """
@@ -188,6 +188,7 @@ class Case:
 
         :param script: The path to the `(All)clean` script. If True, find the clean script automatically. If False, ignore any clean scripts. If None, use the a clean script only if it exists.
         :param check: If True, raise a `RuntimeError` if the clean script returns a non-zero exit code.
+        :param shell: If True, run the clean script in a shell. If False, run the clean script directly. If a path, run the clean script in the specified shell.
         :param env: Environment variables to set for the clean script. If None, use the current environment.
         """
         if script is True or script is None:
@@ -202,18 +203,20 @@ class Case:
                 script_path = self.path / script_path
 
         if script_path is not None:
-            await self._exec(script_path, check=check, env=env)
+            await self._run([script_path], check=check, shell=shell, env=env)
         else:
             for p in self._clean_paths():
                 await aioshutil.rmtree(p)
 
     async def run(
         self,
-        *cmd: Union[str, Path],
+        args: Union[None, Sequence[Union[str, Path]], str] = None,
+        *,
         script: Union[None, bool, Path, str] = None,
         parallel: Optional[bool] = None,
         cpus: Optional[int] = None,
         check: bool = True,
+        shell: Union[None, bool, Path, str] = None,
         env: Optional[Mapping[str, str]] = None,
     ) -> str:
         """
@@ -224,9 +227,10 @@ class Case:
         :param parallel: If True, run in parallel. If False, run in serial. If None, autodetect whether to run in parallel.
         :param cpus: The number of CPUs to reserve for the run. The run will wait until the requested number of CPUs is available. If None, autodetect the number of CPUs to reserve.
         :param check: If True, raise a `RuntimeError` if any command returns a non-zero exit code.
+        :param shell: If True, run the command in a shell. If False, run the command directly. If None, run in a shell if the command is a string, otherwise run directly. If a path, run the command in the specified shell.
         :param env: Environment variables to set for the run script or commands. If None, use the current environment.
         """
-        if not cmd:
+        if not args:
             script_path: Optional[Path]
             if script is not True and script is not False and script is not None:
                 script_path = Path(script)
@@ -241,7 +245,9 @@ class Case:
 
             if script_path is None:
                 if (self.path / "system" / "blockMeshDict").is_file():
-                    await self._exec("blockMesh", check=check, cpus=1, env=env)
+                    await self._run(
+                        ["blockMesh"], check=check, cpus=1, shell=shell, env=env
+                    )
 
                 if parallel is None:
                     if (
@@ -258,15 +264,22 @@ class Case:
                         self._nprocessors() == 0
                         and (self.path / "system" / "decomposeParDict").is_file()
                     ):
-                        await self._exec("decomposePar", check=check, cpus=1, env=env)
+                        await self._run(
+                            ["decomposePar"], check=check, cpus=1, shell=shell, env=env
+                        )
 
                     if cpus is None:
                         cpus = self._nprocessors()
                 else:
                     if cpus is None:
                         cpus = 1
-                return await self._exec(
-                    application, parallel=parallel, check=check, cpus=cpus, env=env
+                return await self._run(
+                    [application],
+                    parallel=parallel,
+                    check=check,
+                    cpus=cpus,
+                    shell=shell,
+                    env=env,
                 )
 
             else:
@@ -280,7 +293,9 @@ class Case:
                         else:
                             cpus = 1
 
-                return await self._exec(script_path, check=check, cpus=cpus, env=env)
+                return await self._run(
+                    [script_path], check=check, cpus=cpus, shell=shell, env=env
+                )
 
         else:
             if script is not None:
@@ -295,8 +310,8 @@ class Case:
                 else:
                     cpus = 1
 
-            return await self._exec(
-                *cmd, parallel=parallel, check=check, cpus=cpus, env=env
+            return await self._run(
+                args, parallel=parallel, check=check, cpus=cpus, shell=shell, env=env
             )
 
     async def copy(self, dest: Union[Path, str]) -> "Case":
