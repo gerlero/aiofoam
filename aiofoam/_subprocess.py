@@ -14,7 +14,7 @@ async def run(
     env: Union[None, Mapping[str, str]] = None,
 ) -> str:
     if shell is None:
-        shell = not isinstance(args, str)
+        shell = isinstance(args, str)
 
     if shell:
         if not isinstance(args, str):
