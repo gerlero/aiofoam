@@ -3,7 +3,7 @@ import pytest_asyncio
 
 import os
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Union
 
 from aiofoam import Case
 
@@ -19,10 +19,13 @@ async def pitz(tmp_path: Path) -> Case:
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("script", [None, False])
-async def test_run(pitz: Case, script: Optional[bool]) -> None:
-    await pitz.run(script=script)
-    await pitz.clean(script=script)
-    await pitz.run(script=script)
+@pytest.mark.parametrize("shell", [None, False, True, Path("/bin/sh")])
+async def test_run(
+    pitz: Case, script: Optional[bool], shell: Union[None, bool, Path]
+) -> None:
+    await pitz.run(script=script, shell=shell)
+    await pitz.clean(script=script, shell=shell if shell is not None else False)
+    await pitz.run(script=script, shell=shell)
 
 
 @pytest.mark.asyncio
