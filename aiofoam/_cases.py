@@ -1,4 +1,5 @@
-import asyncio
+from __future__ import annotations
+
 import os
 
 from pathlib import Path
@@ -22,7 +23,7 @@ class Case:
     :param path: The path to the case directory.
     """
 
-    def __init__(self, path: Union[Path, str]):
+    def __init__(self, path: Union[os.PathLike[str], str]):
         self.path = Path(path).absolute()
         if not self.path.is_dir():
             raise NotADirectoryError(f"{self.path} is not a directory")
@@ -134,11 +135,11 @@ class Case:
 
     async def _run(
         self,
-        args: Union[Sequence[Union[str, Path]], str],
+        args: Union[Sequence[Union[str, os.PathLike[str]]], str],
         *,
         parallel: bool = False,
         check: bool = True,
-        shell: Union[None, bool, Path, str] = None,
+        shell: Union[None, bool, os.PathLike[str], str] = None,
         cpus: int = 0,
         env: Optional[Mapping[str, str]] = None,
     ) -> str:
@@ -178,9 +179,9 @@ class Case:
     async def clean(
         self,
         *,
-        script: Union[None, bool, Path, str] = None,
+        script: Union[None, bool, os.PathLike[str], str] = None,
         check: bool = False,
-        shell: Union[bool, Path, str] = False,
+        shell: Union[bool, os.PathLike[str], str] = False,
         env: Optional[Mapping[str, str]] = None,
     ) -> None:
         """
@@ -314,7 +315,7 @@ class Case:
                 args, parallel=parallel, check=check, cpus=cpus, shell=shell, env=env
             )
 
-    async def copy(self, dest: Union[Path, str]) -> "Case":
+    async def copy(self, dest: Union[os.PathLike[str], str]) -> Case:
         """
         Make a copy of this case.
 
@@ -322,7 +323,7 @@ class Case:
         """
         return Case(await aioshutil.copytree(self.path, dest, symlinks=True))
 
-    async def clone(self, dest: Union[Path, str]) -> "Case":
+    async def clone(self, dest: Union[os.PathLike[str], str]) -> Case:
         """
         Clone this case (make a clean copy).
 
@@ -348,7 +349,7 @@ class Case:
         """
         return self.path.name
 
-    def to_pyfoam(self) -> "SolutionDirectory":
+    def to_pyfoam(self) -> SolutionDirectory:
         """
         Create a PyFoam `SolutionDirectory` from this case. Requires `PyFoam` to be installed.
         """

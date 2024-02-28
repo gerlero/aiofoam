@@ -1,16 +1,18 @@
+from __future__ import annotations
+
 import asyncio
 import sys
+import os
 
-from pathlib import Path
 from typing import Union, Sequence, Mapping
 
 
 async def run(
-    args: Union[Sequence[Union[str, Path]], str],
+    args: Union[Sequence[Union[str, os.PathLike[str]]], str],
     *,
     check: bool = True,
-    shell: Union[None, bool, Path, str] = None,
-    cwd: Union[None, str, Path] = None,
+    shell: Union[None, bool, os.PathLike[str], str] = None,
+    cwd: Union[None, str, os.PathLike[str]] = None,
     env: Union[None, Mapping[str, str]] = None,
 ) -> str:
     if shell is None:
