@@ -3,7 +3,6 @@ import pytest_asyncio
 
 import os
 from pathlib import Path
-from typing import Optional, Union
 
 from aiofoam import Case
 
@@ -17,32 +16,16 @@ async def flange(tmp_path: Path) -> Case:
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("parallel", [True, False])
-@pytest.mark.parametrize("script", [None, True])
-async def test_run(flange: Case, parallel: bool, script: Optional[bool]) -> None:
-    await flange.run(parallel=parallel, script=script)
-    await flange.clean(script=script)
-    await flange.run(parallel=parallel, script=script)
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "run_script", ["Allrun", "Allrun-parallel", Path("Allrun"), Path("Allrun-parallel")]
-)
-@pytest.mark.parametrize("clean_script", ["Allclean", Path("Allclean")])
-async def test_run_scripts(
-    flange: Case,
-    run_script: Union[Path, str],
-    clean_script: Union[Path, str],
-) -> None:
-    await flange.run(script=run_script)
-    await flange.clean(script=clean_script)
-    await flange.run(script=run_script)
+async def test_run(flange: Case, parallel: bool) -> None:
+    await flange.run(parallel=parallel)
+    await flange.clean()
+    await flange.run(parallel=parallel)
 
 
 @pytest.mark.asyncio
 async def test_run_cmd(flange: Case) -> None:
     (flange.path / "0.orig").rename(flange.path / "0")
-    await flange.run(
+    await flange.cmd(
         [
             "ansysToFoam",
             Path(os.environ["FOAM_TUTORIALS"])
@@ -53,18 +36,26 @@ async def test_run_cmd(flange: Case) -> None:
             "0.001",
         ],
     )
-    await flange.run(["decomposePar"])
-    await flange.run(["laplacianFoam"], parallel=True)
-    await flange.run(["reconstructPar"])
+    await flange.cmd(["decomposePar"])
+    await flange.cmd(["laplacianFoam"], parallel=True, cpus=4)
+    await flange.cmd(["reconstructPar"])
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("script", [None, True])
-async def test_run_no_parallel(
-    flange: Case, script: Union[None, bool, Path, str]
-) -> None:
+async def test_run_cmd_shell(flange: Case) -> None:
+    (flange.path / "0.orig").rename(flange.path / "0")
+    await flange.cmd(
+        'ansysToFoam "$FOAM_TUTORIALS/resources/geometry/flange.ans" -scale 0.001'
+    )
+    await flange.cmd("decomposePar")
+    await flange.cmd("laplacianFoam", parallel=True, cpus=4)
+    await flange.cmd("reconstructPar")
+
+
+@pytest.mark.asyncio
+async def test_run_no_parallel(flange: Case) -> None:
     with pytest.raises(RuntimeError):
-        await flange.run(script=script)
+        await flange.run()
 
 
 def test_path() -> None:
