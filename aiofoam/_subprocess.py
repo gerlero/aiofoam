@@ -3,16 +3,19 @@ import sys
 
 from pathlib import Path
 from typing import Union, Sequence, Mapping
+from subprocess import CompletedProcess, CalledProcessError
+
+__all__ = ["run_process", "CalledProcessError"]
 
 
-async def run(
+async def run_process(
     args: Union[Sequence[Union[str, Path]], str],
     *,
     check: bool = True,
     shell: Union[None, bool, Path, str] = None,
     cwd: Union[None, str, Path] = None,
     env: Union[None, Mapping[str, str]] = None,
-) -> str:
+) -> "CompletedProcess[bytes]":
     if shell is None:
         shell = isinstance(args, str)
 
@@ -58,8 +61,11 @@ async def run(
 
     stdout, stderr = await proc.communicate()
 
-    if check and proc.returncode != 0:
-        raise RuntimeError(
-            f"{args} failed with return code {proc.returncode}\n{stderr.decode()}"
-        )
-    return stdout.decode()
+    assert proc.returncode is not None
+
+    ret = CompletedProcess(args, proc.returncode, stdout, stderr)
+
+    if check:
+        ret.check_returncode()
+
+    return ret
