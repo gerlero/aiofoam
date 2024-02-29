@@ -18,14 +18,10 @@ async def pitz(tmp_path: Path) -> Case:
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("script", [None, False])
-@pytest.mark.parametrize("shell", [None, False, True, Path("/bin/sh")])
-async def test_run(
-    pitz: Case, script: Optional[bool], shell: Union[None, bool, Path]
-) -> None:
-    await pitz.run(script=script, shell=shell)
-    await pitz.clean(script=script, shell=shell if shell is not None else False)
-    await pitz.run(script=script, shell=shell)
+async def test_run(pitz: Case) -> None:
+    await pitz.run()
+    await pitz.clean()
+    await pitz.run()
 
 
 @pytest.mark.asyncio
@@ -36,16 +32,9 @@ async def test_double_clean(pitz: Case) -> None:
 
 
 @pytest.mark.asyncio
-async def test_run_script(pitz: Case) -> None:
+async def test_run_parallel(pitz: Case) -> None:
     with pytest.raises(RuntimeError):
-        await pitz.run(script=True)
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize("script", [None, False])
-async def test_run_parallel(pitz: Case, script: Optional[bool]) -> None:
-    with pytest.raises(RuntimeError):
-        await pitz.run(script=script, parallel=True)
+        await pitz.run(parallel=True)
 
 
 @pytest.mark.asyncio
