@@ -1,4 +1,4 @@
-__version__ = "0.4.0"
+__version__ = "0.4.1"
 
 from ._cases import Case
 from ._cpus import max_cpus
