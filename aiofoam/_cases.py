@@ -178,7 +178,7 @@ class Case:
                 )
         except CalledProcessError as e:
             raise RuntimeError(
-                f"{args} failed with return code {e.returncode}\n{e.stderr}"
+                f"{args} failed with return code {e.returncode}\n{e.stderr.decode()}"
             )
 
         return proc.stdout.decode()
