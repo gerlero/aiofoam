@@ -10,7 +10,7 @@ try:
 except ModuleNotFoundError:
     pass
 
-from ._subprocess import run
+from ._subprocess import run_process, CalledProcessError
 from ._cpus import exclusive_cpus
 
 
@@ -165,14 +165,21 @@ class Case:
                 *args[1:],
             ]
 
-        async with exclusive_cpus(cpus):
-            return await run(
-                args,
-                check=check,
-                shell=shell,
-                cwd=self.path,
-                env=env,
+        try:
+            async with exclusive_cpus(cpus):
+                proc = await run_process(
+                    args,
+                    check=check,
+                    shell=shell,
+                    cwd=self.path,
+                    env=env,
+                )
+        except CalledProcessError as e:
+            raise RuntimeError(
+                f"{args} failed with return code {e.returncode}\n{e.stderr}"
             )
+
+        return proc.stdout.decode()
 
     async def clean(
         self,
