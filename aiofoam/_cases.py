@@ -193,7 +193,7 @@ class Case:
         """
         Clean this case.
 
-        :param script: The path to the `(All)clean` script. If True, use a clean script if it exists. If False, ignore any clean scripts.
+        :param script: If True, use an (All)clean script if it exists. If False, ignore any clean scripts.
         :param check: If True, raise a `RuntimeError` if the clean script returns a non-zero exit code.
         :param env: Environment variables to set for the clean script. If None, use the current environment.
         """
@@ -216,7 +216,8 @@ class Case:
     ) -> str:
         """
         Run this case.
-        :param script: The path to the `(All)run` script. If True, find any run scripts automatically. If False, ignore any run scripts.
+
+        :param script: If True, use an (All)run(-parallel) script if it exists. If False, ignore any run scripts.
         :param parallel: If True, run in parallel. If False, run in serial. If None, autodetect whether to run in parallel.
         :param cpus: The number of CPUs to reserve for the run. The run will wait until the requested number of CPUs is available. If None, autodetect the number of CPUs to reserve.
         :param check: If True, raise a `RuntimeError` if any command returns a non-zero exit code.
