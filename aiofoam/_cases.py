@@ -12,6 +12,7 @@ except ModuleNotFoundError:
 
 from ._subprocess import run_process, CalledProcessError
 from ._cpus import exclusive_cpus
+from ._dictionaries import FoamFile
 
 
 class Case:
@@ -91,40 +92,30 @@ class Case:
         else:
             return None
 
-    async def _application(self) -> str:
+    @property
+    def _application(self) -> str:
         """
         Return the application name as set in the controlDict.
         """
-        return (
-            await self.cmd(
-                [
-                    "foamDictionary",
-                    "-entry",
-                    "application",
-                    "-value",
-                    "system/controlDict",
-                ]
-            )
-        ).strip()
+        application = FoamFile(self.path / "system" / "controlDict")["application"]
+        assert isinstance(application, str)
+        return application
 
-    async def _nsubdomains(self) -> Optional[int]:
+    @property
+    def _nsubdomains(self) -> Optional[int]:
         """
         Return the number of subdomains as set in the decomposeParDict, or None if no decomposeParDict is found.
         """
-        if not (self.path / "system" / "decomposeParDict").is_file():
+        try:
+            nsubdomains_entry = FoamFile(self.path / "system" / "decomposeParDict")[
+                "numberOfSubdomains"
+            ]
+            assert isinstance(nsubdomains_entry, str)
+            return int(nsubdomains_entry)
+        except FileNotFoundError:
             return None
-        return int(
-            await self.cmd(
-                [
-                    "foamDictionary",
-                    "-entry",
-                    "numberOfSubdomains",
-                    "-value",
-                    "system/decomposeParDict",
-                ]
-            )
-        )
 
+    @property
     def _nprocessors(self) -> int:
         """
         Return the number of processor directories in the case.
@@ -157,12 +148,12 @@ class Case:
 
         if parallel:
             if isinstance(args, str) or not isinstance(args, Sequence):
-                args = f"mpiexec -np {self._nprocessors()} {args} -parallel"
+                args = f"mpiexec -np {self._nprocessors} {args} -parallel"
             else:
                 args = [
                     "mpiexec",
                     "-np",
-                    str(self._nprocessors()),
+                    str(self._nprocessors),
                     args[0],
                     "-parallel",
                     *args[1:],
@@ -227,10 +218,10 @@ class Case:
 
         if script_path is not None:
             if cpus is None:
-                if self._nprocessors() > 0:
-                    cpus = self._nprocessors()
+                if self._nprocessors > 0:
+                    cpus = self._nprocessors
                 else:
-                    nsubdomains = await self._nsubdomains()
+                    nsubdomains = self._nsubdomains
                     if nsubdomains is not None:
                         cpus = nsubdomains
                     else:
@@ -244,27 +235,25 @@ class Case:
 
             if parallel is None:
                 parallel = (
-                    self._nprocessors() > 0
+                    self._nprocessors > 0
                     or (self.path / "system" / "decomposeParDict").is_file()
                 )
 
             if parallel:
                 if (
-                    self._nprocessors() == 0
+                    self._nprocessors == 0
                     and (self.path / "system" / "decomposeParDict").is_file()
                 ):
                     await self.cmd(["decomposePar"], check=check, env=env)
 
                 if cpus is None:
-                    cpus = min(self._nprocessors(), 1)
+                    cpus = min(self._nprocessors, 1)
             else:
                 if cpus is None:
                     cpus = 1
 
-            application = await self._application()
-
             return await self.cmd(
-                [application],
+                [self._application],
                 parallel=parallel,
                 check=check,
                 cpus=cpus,
