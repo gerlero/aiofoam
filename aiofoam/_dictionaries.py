@@ -1,10 +1,15 @@
 from pathlib import Path
 from typing import Any, Union, Sequence, Iterator, Optional, Mapping, MutableMapping
 
+try:
+    from PyFoam.RunDictionary.ParsedParameterFile import ParsedParameterFile  # type: ignore
+except ModuleNotFoundError:
+    pass
+
 from ._subprocess import run_process_sync, CalledProcessError
 
 
-class Dictionary(MutableMapping[str, Union[str, "Dictionary"]]):
+class Dictionary(MutableMapping[str, Union[str, int, float, "Dictionary"]]):
     """An OpenFOAM dictionary."""
 
     def __init__(self, _file: "FoamFile", _keywords: Sequence[str]) -> None:
@@ -24,7 +29,7 @@ class Dictionary(MutableMapping[str, Union[str, "Dictionary"]]):
 
         return (
             run_process_sync(
-                ["foamDictionary", *args, self._file.path],
+                ["foamDictionary", *args, "-precision", "15", self._file.path],
             )
             .stdout.decode()
             .strip()
@@ -43,7 +48,7 @@ class Dictionary(MutableMapping[str, Union[str, "Dictionary"]]):
         else:
             return str(d)
 
-    def __getitem__(self, key: str) -> Union[str, "Dictionary"]:
+    def __getitem__(self, key: str) -> Union[str, int, float, "Dictionary"]:
         try:
             ret = self._foam_dictionary(["-value"], key=key)
         except CalledProcessError as e:
@@ -54,6 +59,16 @@ class Dictionary(MutableMapping[str, Union[str, "Dictionary"]]):
 
         if ret.startswith("{"):
             return Dictionary(self._file, [*self._keywords, key])
+
+        try:
+            return int(ret)
+        except ValueError:
+            pass
+
+        try:
+            return float(ret)
+        except ValueError:
+            pass
 
         return ret
 
@@ -85,6 +100,14 @@ class FoamFile(Dictionary):
             raise IsADirectoryError(self.path)
         elif not self.path.is_file():
             raise FileNotFoundError(self.path)
+
+    def to_pyfoam(self) -> "ParsedParameterFile":
+        """
+        Create a PyFoam `ParsedParameterFile` from this case. Requires `PyFoam` to be installed.
+        """
+        from PyFoam.RunDictionary.ParsedParameterFile import ParsedParameterFile
+
+        return ParsedParameterFile(self.path)
 
     def __fspath__(self) -> str:
         return str(self.path)
