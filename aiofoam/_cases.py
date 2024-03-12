@@ -107,11 +107,11 @@ class Case:
         Return the number of subdomains as set in the decomposeParDict, or None if no decomposeParDict is found.
         """
         try:
-            nsubdomains_entry = FoamFile(self.path / "system" / "decomposeParDict")[
+            nsubdomains = FoamFile(self.path / "system" / "decomposeParDict")[
                 "numberOfSubdomains"
             ]
-            assert isinstance(nsubdomains_entry, str)
-            return int(nsubdomains_entry)
+            assert isinstance(nsubdomains, int)
+            return nsubdomains
         except FileNotFoundError:
             return None
 
