@@ -1,7 +1,7 @@
 import os
 
 from pathlib import Path
-from typing import Optional, Union, Mapping, Set, Sequence
+from typing import Optional, Union, Collection, Mapping, Set, Sequence
 
 import aioshutil
 
@@ -281,9 +281,12 @@ class Case:
 
         dest = Path(dest)
         clean_paths = self._clean_paths()
-        for p in self.path.iterdir():
-            if p not in clean_paths:
-                await aioshutil.copytree(p, dest / p.name, symlinks=True)
+
+        def ignore(path: Union[Path, str], names: Collection[str]) -> Collection[str]:
+            paths = {Path(path) / name for name in names}
+            return {p.name for p in paths.intersection(clean_paths)}
+
+        await aioshutil.copytree(self.path, dest, symlinks=True, ignore=ignore)
 
         return Case(dest)
 
