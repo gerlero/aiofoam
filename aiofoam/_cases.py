@@ -97,7 +97,7 @@ class Case:
         """
         Return the application name as set in the controlDict.
         """
-        application = FoamFile(self.path / "system" / "controlDict")["application"]
+        application = self.control_dict["application"]
         assert isinstance(application, str)
         return application
 
@@ -107,9 +107,7 @@ class Case:
         Return the number of subdomains as set in the decomposeParDict, or None if no decomposeParDict is found.
         """
         try:
-            nsubdomains = FoamFile(self.path / "system" / "decomposeParDict")[
-                "numberOfSubdomains"
-            ]
+            nsubdomains = self.decompose_par_dict["numberOfSubdomains"]
             assert isinstance(nsubdomains, int)
             return nsubdomains
         except FileNotFoundError:
@@ -231,7 +229,7 @@ class Case:
 
         else:
             if (self.path / "system" / "blockMeshDict").is_file():
-                await self.cmd(["blockMesh"], check=check, env=env)
+                await self.block_mesh()
 
             if parallel is None:
                 parallel = (
@@ -244,7 +242,7 @@ class Case:
                     self._nprocessors == 0
                     and (self.path / "system" / "decomposeParDict").is_file()
                 ):
-                    await self.cmd(["decomposePar"], check=check, env=env)
+                    await self.decompose_par()
 
                 if cpus is None:
                     cpus = min(self._nprocessors, 1)
@@ -259,6 +257,24 @@ class Case:
                 cpus=cpus,
                 env=env,
             )
+
+    async def block_mesh(self) -> None:
+        """
+        Run blockMesh on this case.
+        """
+        await self.cmd(["blockMesh"])
+
+    async def decompose_par(self) -> None:
+        """
+        Decompose this case for parallel running.
+        """
+        await self.cmd(["decomposePar"])
+
+    async def reconstruct_par(self) -> None:
+        """
+        Reconstruct this case after parallel running.
+        """
+        await self.cmd(["reconstructPar"])
 
     async def copy(self, dest: Union[Path, str]) -> "Case":
         """
@@ -296,6 +312,55 @@ class Case:
         The name of the case.
         """
         return self.path.name
+
+    @property
+    def control_dict(self) -> FoamFile:
+        """
+        The controlDict file.
+        """
+        return FoamFile(self.path / "system" / "controlDict")
+
+    @property
+    def fv_schemes(self) -> FoamFile:
+        """
+        The fvSchemes file.
+        """
+        return FoamFile(self.path / "system" / "fvSchemes")
+
+    @property
+    def fv_solution(self) -> FoamFile:
+        """
+        The fvSolution file.
+        """
+        return FoamFile(self.path / "system" / "fvSolution")
+
+    @property
+    def decompose_par_dict(self) -> FoamFile:
+        """
+        The decomposeParDict file.
+        """
+        return FoamFile(self.path / "system" / "decomposeParDict")
+
+    @property
+    def block_mesh_dict(self) -> FoamFile:
+        """
+        The blockMeshDict file.
+        """
+        return FoamFile(self.path / "system" / "blockMeshDict")
+
+    @property
+    def transport_properties(self) -> FoamFile:
+        """
+        The transportProperties file.
+        """
+        return FoamFile(self.path / "constant" / "transportProperties")
+
+    @property
+    def turbulence_properties(self) -> FoamFile:
+        """
+        The turbulenceProperties file.
+        """
+        return FoamFile(self.path / "constant" / "turbulenceProperties")
 
     def to_pyfoam(self) -> "SolutionDirectory":
         """
