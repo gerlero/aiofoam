@@ -40,3 +40,9 @@ def test_write_read(tmp_path: Path) -> None:
     ssd = sd["subsubdict"]
     assert isinstance(ssd, Dictionary)
     assert ssd["key"] == "value"
+
+    sd["list"] = [1, 2, 3]
+    assert sd["list"] == [1, 2, 3]
+
+    sd["nestedList"] = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
+    assert sd["nestedList"] == [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
