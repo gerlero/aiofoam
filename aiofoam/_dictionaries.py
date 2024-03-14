@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import Any, Union, Sequence, Iterator, Optional, Mapping, MutableMapping
+from contextlib import suppress
 
 try:
     from PyFoam.RunDictionary.ParsedParameterFile import ParsedParameterFile  # type: ignore
@@ -9,7 +10,9 @@ except ModuleNotFoundError:
 from ._subprocess import run_process_sync, CalledProcessError
 
 
-class Dictionary(MutableMapping[str, Union[str, int, float, "Dictionary"]]):
+class Dictionary(MutableMapping[str, Union["Dictionary._Entry", "Dictionary"]]):
+
+    _Entry = Union[str, int, float, bool, Sequence["_Entry"]]
     """An OpenFOAM dictionary."""
 
     def __init__(self, _file: "FoamFile", _keywords: Sequence[str]) -> None:
@@ -36,19 +39,60 @@ class Dictionary(MutableMapping[str, Union[str, int, float, "Dictionary"]]):
         )
 
     @staticmethod
+    def _parse_entry(entry: str) -> "Dictionary._Entry":
+        if entry == "yes":
+            return True
+        elif entry == "no":
+            return False
+
+        with suppress(ValueError):
+            return int(entry)
+
+        with suppress(ValueError):
+            return float(entry)
+
+        start = entry.find("(")
+        if start != -1:
+            assert entry.endswith(")")
+            elems = []
+            nested = 0
+            start += 2
+            for i, c in enumerate(entry[start:-1], start=start):
+                if c == "(":
+                    nested += 1
+                elif c == ")":
+                    nested -= 1
+                elif c == " " and nested == 0:
+                    elems.append(entry[start:i])
+                    start = i + 1
+
+            return [Dictionary._parse_entry(e) for e in elems]
+
+        return entry
+
+    @staticmethod
     def _str(d: Any) -> str:
+        if isinstance(d, bool):
+            return "yes" if d else "no"
+
         if isinstance(d, Mapping) and not isinstance(d, Dictionary):
             out = "{ "
             for k, v in d.items():
-                out += f"{k} {v}"
+                out += f"{k} {Dictionary._str(v)}"
                 if not isinstance(v, Mapping):
                     out += "; "
             out += "} "
             return out
+        elif isinstance(d, Sequence) and not isinstance(d, str):
+            out = "( "
+            for v in d:
+                out += f"{Dictionary._str(v)} "
+            out += ") "
+            return out
         else:
             return str(d)
 
-    def __getitem__(self, key: str) -> Union[str, int, float, "Dictionary"]:
+    def __getitem__(self, key: str) -> Union[_Entry, "Dictionary"]:
         try:
             ret = self._foam_dictionary(["-value"], key=key)
         except CalledProcessError as e:
@@ -58,19 +102,10 @@ class Dictionary(MutableMapping[str, Union[str, int, float, "Dictionary"]]):
                 raise
 
         if ret.startswith("{"):
+            assert ret.endswith("}")
             return Dictionary(self._file, [*self._keywords, key])
 
-        try:
-            return int(ret)
-        except ValueError:
-            pass
-
-        try:
-            return float(ret)
-        except ValueError:
-            pass
-
-        return ret
+        return Dictionary._parse_entry(ret)
 
     def __setitem__(self, key: str, value: Any) -> None:
         self._foam_dictionary(["-set", self._str(value)], key=key)
@@ -100,6 +135,14 @@ class FoamFile(Dictionary):
             raise IsADirectoryError(self.path)
         elif not self.path.is_file():
             raise FileNotFoundError(self.path)
+
+    @property
+    def internal_field(self) -> Union[Dictionary._Entry, Dictionary]:
+        return self["internalField"]
+
+    @property
+    def boundary_field(self) -> Union[Dictionary._Entry, Dictionary]:
+        return self["boundaryField"]
 
     def to_pyfoam(self) -> "ParsedParameterFile":
         """
