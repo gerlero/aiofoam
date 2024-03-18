@@ -3,10 +3,9 @@ import sys
 
 from pathlib import Path
 from typing import Union, Sequence, Mapping
-import subprocess
-from subprocess import CalledProcessError
+from subprocess import CompletedProcess, CalledProcessError
 
-__all__ = ["run_process", "run_process_sync", "CalledProcessError"]
+__all__ = ["run_process", "CalledProcessError"]
 
 
 async def run_process(
@@ -15,7 +14,7 @@ async def run_process(
     check: bool = True,
     cwd: Union[None, str, Path] = None,
     env: Union[None, Mapping[str, str]] = None,
-) -> "subprocess.CompletedProcess[bytes]":
+) -> "CompletedProcess[bytes]":
     if isinstance(args, str) or not isinstance(args, Sequence):
         proc = await asyncio.create_subprocess_shell(
             str(args),
@@ -40,37 +39,9 @@ async def run_process(
 
     assert proc.returncode is not None
 
-    ret = subprocess.CompletedProcess(args, proc.returncode, stdout, stderr)
+    ret = CompletedProcess(args, proc.returncode, stdout, stderr)
 
     if check:
         ret.check_returncode()
 
     return ret
-
-
-def run_process_sync(
-    args: Union[Sequence[Union[str, Path]], str, Path],
-    *,
-    check: bool = True,
-    cwd: Union[None, str, Path] = None,
-    env: Union[None, Mapping[str, str]] = None,
-) -> "subprocess.CompletedProcess[bytes]":
-    shell = isinstance(args, str) or not isinstance(args, Sequence)
-
-    if sys.version_info < (3, 8):
-        if shell:
-            args = str(args)
-        else:
-            args = (str(arg) for arg in args)
-
-    proc = subprocess.run(
-        args,
-        cwd=cwd,
-        env=env,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        shell=shell,
-        check=check,
-    )
-
-    return proc
