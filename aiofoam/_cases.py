@@ -1,7 +1,7 @@
 import os
 
 from pathlib import Path
-from typing import Optional, Union, Collection, Mapping, Set, Sequence
+from typing import Optional, Union, Mapping, Set, Sequence
 
 import aioshutil
 
@@ -12,7 +12,6 @@ except ModuleNotFoundError:
 
 from ._subprocess import run_process, CalledProcessError
 from ._cpus import exclusive_cpus
-from ._dictionaries import FoamFile
 
 
 class Case:
@@ -92,28 +91,40 @@ class Case:
         else:
             return None
 
-    @property
-    def _application(self) -> str:
+    async def _application(self) -> str:
         """
         Return the application name as set in the controlDict.
         """
-        application = self.control_dict["application"]
-        assert isinstance(application, str)
-        return application
+        return (
+            await self.cmd(
+                [
+                    "foamDictionary",
+                    "-entry",
+                    "application",
+                    "-value",
+                    "system/controlDict",
+                ]
+            )
+        ).strip()
 
-    @property
-    def _nsubdomains(self) -> Optional[int]:
+    async def _nsubdomains(self) -> Optional[int]:
         """
         Return the number of subdomains as set in the decomposeParDict, or None if no decomposeParDict is found.
         """
-        try:
-            nsubdomains = self.decompose_par_dict["numberOfSubdomains"]
-            assert isinstance(nsubdomains, int)
-            return nsubdomains
-        except FileNotFoundError:
+        if not (self.path / "system" / "decomposeParDict").is_file():
             return None
+        return int(
+            await self.cmd(
+                [
+                    "foamDictionary",
+                    "-entry",
+                    "numberOfSubdomains",
+                    "-value",
+                    "system/decomposeParDict",
+                ]
+            )
+        )
 
-    @property
     def _nprocessors(self) -> int:
         """
         Return the number of processor directories in the case.
@@ -146,12 +157,12 @@ class Case:
 
         if parallel:
             if isinstance(args, str) or not isinstance(args, Sequence):
-                args = f"mpiexec -np {self._nprocessors} {args} -parallel"
+                args = f"mpiexec -np {self._nprocessors()} {args} -parallel"
             else:
                 args = [
                     "mpiexec",
                     "-np",
-                    str(self._nprocessors),
+                    str(self._nprocessors()),
                     args[0],
                     "-parallel",
                     *args[1:],
@@ -216,10 +227,10 @@ class Case:
 
         if script_path is not None:
             if cpus is None:
-                if self._nprocessors > 0:
-                    cpus = self._nprocessors
+                if self._nprocessors() > 0:
+                    cpus = self._nprocessors()
                 else:
-                    nsubdomains = self._nsubdomains
+                    nsubdomains = await self._nsubdomains()
                     if nsubdomains is not None:
                         cpus = nsubdomains
                     else:
@@ -229,52 +240,36 @@ class Case:
 
         else:
             if (self.path / "system" / "blockMeshDict").is_file():
-                await self.block_mesh()
+                await self.cmd(["blockMesh"], check=check, env=env)
 
             if parallel is None:
                 parallel = (
-                    self._nprocessors > 0
+                    self._nprocessors() > 0
                     or (self.path / "system" / "decomposeParDict").is_file()
                 )
 
             if parallel:
                 if (
-                    self._nprocessors == 0
+                    self._nprocessors() == 0
                     and (self.path / "system" / "decomposeParDict").is_file()
                 ):
-                    await self.decompose_par()
+                    await self.cmd(["decomposePar"], check=check, env=env)
 
                 if cpus is None:
-                    cpus = min(self._nprocessors, 1)
+                    cpus = min(self._nprocessors(), 1)
             else:
                 if cpus is None:
                     cpus = 1
 
+            application = await self._application()
+
             return await self.cmd(
-                [self._application],
+                [application],
                 parallel=parallel,
                 check=check,
                 cpus=cpus,
                 env=env,
             )
-
-    async def block_mesh(self) -> None:
-        """
-        Run blockMesh on this case.
-        """
-        await self.cmd(["blockMesh"])
-
-    async def decompose_par(self) -> None:
-        """
-        Decompose this case for parallel running.
-        """
-        await self.cmd(["decomposePar"])
-
-    async def reconstruct_par(self) -> None:
-        """
-        Reconstruct this case after parallel running.
-        """
-        await self.cmd(["reconstructPar"])
 
     async def copy(self, dest: Union[Path, str]) -> "Case":
         """
@@ -297,12 +292,9 @@ class Case:
 
         dest = Path(dest)
         clean_paths = self._clean_paths()
-
-        def ignore(path: Union[Path, str], names: Collection[str]) -> Collection[str]:
-            paths = {Path(path) / name for name in names}
-            return {p.name for p in paths.intersection(clean_paths)}
-
-        await aioshutil.copytree(self.path, dest, symlinks=True, ignore=ignore)
+        for p in self.path.iterdir():
+            if p not in clean_paths:
+                await aioshutil.copytree(p, dest / p.name, symlinks=True)
 
         return Case(dest)
 
@@ -312,55 +304,6 @@ class Case:
         The name of the case.
         """
         return self.path.name
-
-    @property
-    def control_dict(self) -> FoamFile:
-        """
-        The controlDict file.
-        """
-        return FoamFile(self.path / "system" / "controlDict")
-
-    @property
-    def fv_schemes(self) -> FoamFile:
-        """
-        The fvSchemes file.
-        """
-        return FoamFile(self.path / "system" / "fvSchemes")
-
-    @property
-    def fv_solution(self) -> FoamFile:
-        """
-        The fvSolution file.
-        """
-        return FoamFile(self.path / "system" / "fvSolution")
-
-    @property
-    def decompose_par_dict(self) -> FoamFile:
-        """
-        The decomposeParDict file.
-        """
-        return FoamFile(self.path / "system" / "decomposeParDict")
-
-    @property
-    def block_mesh_dict(self) -> FoamFile:
-        """
-        The blockMeshDict file.
-        """
-        return FoamFile(self.path / "system" / "blockMeshDict")
-
-    @property
-    def transport_properties(self) -> FoamFile:
-        """
-        The transportProperties file.
-        """
-        return FoamFile(self.path / "constant" / "transportProperties")
-
-    @property
-    def turbulence_properties(self) -> FoamFile:
-        """
-        The turbulenceProperties file.
-        """
-        return FoamFile(self.path / "constant" / "turbulenceProperties")
 
     def to_pyfoam(self) -> "SolutionDirectory":
         """
