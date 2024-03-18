@@ -1,5 +1,8 @@
 # aiofoam
 
+| ⚠️ This project is deprecated: it is superseded by [`foamlib`](https://github.com/gerlero/foamlib) |
+| ---- |
+
 [![Documentation](https://img.shields.io/readthedocs/aiofoam)](https://aiofoam.readthedocs.io/)
 [![CI](https://github.com/gerlero/aiofoam/actions/workflows/ci.yml/badge.svg)](https://github.com/gerlero/aiofoam/actions/workflows/ci.yml)
 [![Codecov](https://codecov.io/gh/gerlero/aiofoam/branch/main/graph/badge.svg)](https://codecov.io/gh/gerlero/aiofoam)
